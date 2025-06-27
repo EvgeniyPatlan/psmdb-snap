@@ -1,4 +1,4 @@
-name: Build Snap Package
+name: Build Snap (Docker)
 
 on:
   push:
@@ -10,21 +10,23 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Build Snap (host mode)
+    name: Build Snap using Docker
     steps:
-      - name: Checkout source
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Snapcraft
+      - name: Set up Docker and permissions
         run: |
           sudo apt-get update
-          sudo apt-get install -y snapd squashfs-tools
-          sudo snap install snapcraft --classic
+          sudo apt-get install -y docker.io
 
-      - name: Build Snap using host mode
+      - name: Build Snap in Docker
         run: |
-          export CRAFT_PROVIDERS=host
-          snapcraft
+          docker run --rm -t \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            snapcore/snapcraft:stable \
+            snapcraft
 
       - name: Upload Snap artifact
         uses: actions/upload-artifact@v4
