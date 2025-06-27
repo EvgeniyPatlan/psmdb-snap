@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# post-refresh hook for percona-mongodb snap
+
+set -eux
+
+CONF_DIR="${SNAP_DATA}/etc/mongod"
+ETC_DIR="${SNAP_DATA}/etc"
+MONGOS_CONFIG="${CONF_DIR}/mongos.conf"
+LOG_DIR="${SNAP_COMMON}/var/log/mongodb"
+LDAP_CONF_DIR="${ETC_DIR}/ldap"
+
+# Recover missing mongos.conf after refresh
+if [ ! -f "$MONGOS_CONFIG" ]; then
+    echo "mongos.conf not found, restoring default..."
+
+    # Ensure config directory exists and has permission
+    mkdir -p "$CONF_DIR"
+    chown root:snap_daemon "$CONF_DIR"
+
+    # Copy base config
+    cp "${SNAP}/etc/mongod.conf" "$MONGOS_CONFIG"
+
+    # Patch values to Snap-compatible
+    yq -i ".processManagement.fork = false" "$MONGOS_CONFIG"
+    yq -i ".systemLog.path = \"${LOG_DIR}/mongos.log\"" "$MONGOS_CONFIG"
+    yq -i ".net.port = 27018" "$MONGOS_CONFIG"
+    yq -i "del(.storage)" "$MONGOS_CONFIG"
+
+    # Fix ownership
+    chown -R 584788:root "$CONF_DIR"
+fi
+
+# Recover LDAP config if missing
+if [ ! -d "$LDAP_CONF_DIR" ]; then
+    echo "LDAP config not found, restoring default..."
+
+    mkdir -p "$ETC_DIR"
+    chown root:snap_daemon "$ETC_DIR"
+
+    cp -r "${SNAP}/etc/ldap" "$ETC_DIR"
+
+    chown -R 584788:root "$LDAP_CONF_DIR"
+fi
+

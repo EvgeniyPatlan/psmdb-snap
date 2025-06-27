@@ -1,0 +1,139 @@
+name: percona-distribution-mongodb-80
+base: core22
+version: "8.0"
+summary: Percona Server for MongoDB 8.0 with Backup, Metrics, and Wrappers
+description: |
+  Enterprise-ready Snap for Percona Server for MongoDB 8.0 with integrated backup (PBM),
+  monitoring (mongodb_exporter), mongosh, and user-friendly wrappers. Built using
+  Percona APT repositories managed by percona-release.
+
+grade: devel
+confinement: strict
+
+architectures:
+  - amd64
+  - arm64
+
+system-usernames:
+  snap_daemon: shared
+
+hooks:
+  install:
+    plugs: [network, network-bind]
+  configure:
+    plugs: [network, network-bind]
+  post-refresh:
+    plugs: [network, network-bind]
+
+environment:
+  LDAPCONF: $SNAP_DATA/etc/ldap/ldap.conf
+
+slots:
+  logs:
+    interface: content
+    source:
+      read:
+        - $SNAP_COMMON/var/log/mongodb
+        - $SNAP_COMMON/var/log/mongos
+        - $SNAP_COMMON/var/log/pbm
+
+apps:
+  mongod:
+    command: bin/start-mongod.sh
+    daemon: simple
+    install-mode: disable
+    restart-condition: always
+    restart-delay: 20s
+    plugs: [network, network-bind]
+    slots: [logs]
+
+  mongosh:
+    command: bin/drop_priv.sh mongosh
+    plugs: [network]
+
+  pbm:
+    command: bin/drop_priv.sh pbm
+    plugs: [network, network-bind]
+
+  pbm-agent:
+    command: bin/start-pbm-agent.sh
+    daemon: simple
+    install-mode: disable
+    restart-condition: always
+    restart-delay: 20s
+    plugs: [network, network-bind]
+    slots: [logs]
+
+  mongodb-exporter:
+    command: bin/start-mongodb-exporter.sh
+    daemon: simple
+    install-mode: disable
+    restart-condition: always
+    restart-delay: 20s
+    plugs: [network, network-bind]
+
+
+  mongos:
+    command: bin/start-mongos.sh
+    daemon: simple
+    install-mode: disable
+    restart-condition: always
+    restart-delay: 20s
+    plugs: [network, network-bind]
+    slots: [logs]
+
+parts:
+  percona-repo:
+    plugin: nil
+    build-packages:
+      - wget
+      - gnupg
+      - lsb-release
+      - ca-certificates
+      - curl
+    override-pull: |
+      set -eux
+      snapcraftctl pull
+      wget https://repo.percona.com/apt/percona-release_1.0-30.generic_all.deb
+      apt install -y ./percona-release_1.0-30.generic_all.deb
+      percona-release enable psmdb-80 release
+
+  psmdb-and-tools:
+    after: [percona-repo]
+    plugin: nil
+    override-build: |
+      set -eux
+      apt-get install -y \
+        percona-server-mongodb \
+        percona-backup-mongodb \
+        percona-mongodb-mongosh \
+        percona-toolkit \
+        util-linux \
+        libldap-common || echo "Some packages may not be available"
+    stage-packages:
+      - percona-server-mongodb
+      - percona-backup-mongodb
+      - percona-mongodb-mongosh
+      - percona-toolkit
+      - util-linux
+      - libldap-common
+
+  mongodb-exporter:
+    plugin: dump
+    source: https://github.com/percona/mongodb_exporter/releases/download/v0.40.0/mongodb_exporter-0.40.0.linux-amd64.tar.gz
+    override-build: |
+      mkdir -p $CRAFT_PART_INSTALL/bin
+      cp mongodb_exporter $CRAFT_PART_INSTALL/bin/
+
+  wrapper-scripts:
+    plugin: dump
+    source: snap/local
+    organize:
+      drop_priv.sh: bin/drop_priv.sh
+      start-mongod.sh: bin/start-mongod.sh
+      start-pbm-agent.sh: bin/start-pbm-agent.sh
+      start-mongodb-exporter.sh: bin/start-mongodb-exporter.sh
+    override-build: |
+      snapcraftctl build
+      find $CRAFT_PART_INSTALL -name "*.sh" -exec chmod +x {} \;
+

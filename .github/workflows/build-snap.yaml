@@ -1,0 +1,41 @@
+name: Build Snap Package
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build Snap (LXD)
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Snapcraft and LXD
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y snapd
+          sudo snap install snapcraft --classic
+          sudo snap install lxd
+          sudo usermod -aG lxd $USER || true
+          newgrp lxd <<EONG
+            lxd init --auto
+EONG
+
+      - name: Wait for LXD to become ready
+        run: |
+          sleep 10
+          lxd waitready || true
+
+      - name: Build Snap
+        run: snapcraft --use-lxd
+
+      - name: Upload Snap artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: percona-distribution-mongodb-80.snap
+          path: ./*.snap

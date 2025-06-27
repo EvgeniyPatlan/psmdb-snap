@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Installation hook for percona-distribution-mongodb-80 snap
+
+set -eux
+
+export ETC="${SNAP_DATA}/etc"
+export CONF="${SNAP_DATA}/etc/mongod"
+export PBM_CONF="${SNAP_DATA}/etc/pbm"
+export DATA="${SNAP_COMMON}/var/lib/mongodb"
+export LOGS="${SNAP_COMMON}/var/log/mongodb"
+export MONGO_CONFIG_FILE="${CONF}/mongod.conf"
+export MONGOS_CONFIG_FILE="${CONF}/mongos.conf"
+
+# Create necessary directories
+mkdir -p "$DATA" "$LOGS" "$PBM_CONF" "$CONF"
+
+# Set permissions if created by root
+if [ "$(stat -c '%u' "$DATA")" == "0" ]; then
+  chmod -R 770 "${SNAP_COMMON}"
+  chmod 750 "$DATA"
+fi
+
+if [ "$(stat -c '%u' "$LOGS")" == "0" ]; then
+  chmod -R 770 "${SNAP_COMMON}"
+  chmod g+s "$LOGS" || true
+fi
+
+# Assign ownership to snap_daemon (UID hardcoded in Snap runtime)
+chown -R 584788:root "${SNAP_COMMON}"/* || true
+
+# Copy default config to mongod.conf
+echo "Setting up mongod.conf at $MONGO_CONFIG_FILE"
+cp "${SNAP}/etc/mongod.conf" "$MONGO_CONFIG_FILE"
+
+# Copy and patch default config to mongos.conf
+echo "Setting up mongos.conf at $MONGOS_CONFIG_FILE"
+cp "${SNAP}/etc/mongod.conf" "$MONGOS_CONFIG_FILE"
+
+# Patch mongod.conf for Snap paths
+yq -i ".processManagement.fork = false" "$MONGO_CONFIG_FILE"
+yq -i ".systemLog.path = \"$LOGS/mongod.log\"" "$MONGO_CONFIG_FILE"
+yq -i ".storage.dbPath = \"$DATA\"" "$MONGO_CONFIG_FILE"
+
+# Patch mongos.conf
+yq -i ".processManagement.fork = false" "$MONGOS_CONFIG_FILE"
+yq -i ".systemLog.path = \"$LOGS/mongos.log\"" "$MONGOS_CONFIG_FILE"
+yq -i ".net.port = 27018" "$MONGOS_CONFIG_FILE"
+yq -i "del(.storage)" "$MONGOS_CONFIG_FILE"
+
+# Isolated LDAP config
+cp -r "${SNAP}/etc/ldap" "$ETC"
+
+# Ensure snap_daemon can write configs
+chown -R 584788:root "$SNAP_DATA"/*
+
