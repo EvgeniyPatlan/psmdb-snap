@@ -1,4 +1,4 @@
-name: Build Snap (Docker)
+name: Build Snap (Destructive Mode)
 
 on:
   push:
@@ -10,18 +10,18 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Build Snap using Docker
+    name: Build Snap without LXD
     steps:
-      - name: Checkout repository
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Build Snap in Docker
+      - name: Install Snapcraft
         run: |
-          docker run --rm -t \
-            -v "$PWD:/workspace" \
-            -w /workspace \
-            snapcore/snapcraft:stable \
-            snapcraft
+          sudo snap install snapcraft --classic
+
+      - name: Build Snap using destructive mode
+        run: |
+          snapcraft --destructive-mode
 
       - name: Upload Snap artifact
         uses: actions/upload-artifact@v4
