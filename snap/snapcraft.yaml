@@ -41,7 +41,6 @@ apps:
   mongod:
     command: bin/start-mongod.sh
     daemon: simple
-    install-mode: disable
     restart-condition: always
     restart-delay: 20s
     plugs: [network, network-bind]
@@ -58,7 +57,6 @@ apps:
   pbm-agent:
     command: bin/start-pbm-agent.sh
     daemon: simple
-    install-mode: disable
     restart-condition: always
     restart-delay: 20s
     plugs: [network, network-bind]
@@ -67,16 +65,13 @@ apps:
   mongodb-exporter:
     command: bin/start-mongodb-exporter.sh
     daemon: simple
-    install-mode: disable
     restart-condition: always
     restart-delay: 20s
     plugs: [network, network-bind]
 
-
   mongos:
     command: bin/start-mongos.sh
     daemon: simple
-    install-mode: disable
     restart-condition: always
     restart-delay: 20s
     plugs: [network, network-bind]
@@ -131,9 +126,9 @@ parts:
     organize:
       drop_priv.sh: bin/drop_priv.sh
       start-mongod.sh: bin/start-mongod.sh
+      start-mongos.sh: bin/start-mongos.sh
       start-pbm-agent.sh: bin/start-pbm-agent.sh
       start-mongodb-exporter.sh: bin/start-mongodb-exporter.sh
     override-build: |
       snapcraftctl build
       find $CRAFT_PART_INSTALL -name "*.sh" -exec chmod +x {} \;
-
